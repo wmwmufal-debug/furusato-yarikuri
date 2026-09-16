@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ふるさと納税 やりくり帳</title>
+<meta name="description" content="楽天ふるさと納税の返礼品URLを貼るだけで、寄付合計・残り枠・おすすめの組み合わせを計算するツール">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#bf3b2c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root{
+  --bg:#f7f4ee; --card:#fff; --ink:#2a2622; --sub:#6f675e; --line:#e6dfd3;
+  --accent:#bf3b2c; --accent-soft:#fbe9e5; --done:#2f7d5b; --done-soft:#e3f2ea;
+  --cand:#d99a2b; --cand-soft:#fbf1dc; --warn:#b3261e; --radius:14px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 80px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+header h1{font-size:22px;margin:0;flex:1;min-width:200px;letter-spacing:.02em}
+header h1 small{display:block;font-size:12px;color:var(--sub);font-weight:normal}
+select,input,button,textarea{font:inherit;color:inherit}
+input[type=text],input[type=number],input[type=url],select,textarea{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
+button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 14px;cursor:pointer;white-space:nowrap}
+button:hover{background:#faf7f2}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.primary:hover{filter:brightness(1.07)}
+button.small{padding:4px 10px;font-size:13px}
+button.ghost{border-color:transparent;background:transparent;color:var(--sub)}
+button:disabled{opacity:.5;cursor:default}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:16px}
+.card h2{font-size:16px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.card h2 .num{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px}
+.muted{color:var(--sub);font-size:13px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row > .grow{flex:1;min-width:180px}
+label.f{display:block;font-size:12px;color:var(--sub);margin-bottom:4px}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+details summary{cursor:pointer;color:var(--sub);font-size:14px;margin-top:10px}
+details[open] summary{margin-bottom:10px}
+
+/* summary */
+.sum{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0 10px}
+.sum div{background:#faf8f4;border-radius:10px;padding:10px 12px}
+.sum b{display:block;font-size:20px;font-variant-numeric:tabular-nums;line-height:1.3}
+.sum span{font-size:12px;color:var(--sub)}
+.sum .rest b{color:var(--accent)}
+.sum .rest.over b{color:var(--warn)}
+@media (max-width:640px){
+  .sum{grid-template-columns:repeat(2,1fr)}
+  header h1{font-size:18px;min-width:0;flex-basis:100%;order:-1}
+  header{gap:8px}
+  .wrap{padding-top:14px}
+}
+.bar{position:relative;height:14px;border-radius:7px;background:#eee7dc;overflow:hidden}
+.bar i{position:absolute;top:0;bottom:0;left:0}
+.bar .d{background:var(--done)}
+.bar .c{background:repeating-linear-gradient(45deg,var(--cand),var(--cand) 6px,#e9b95c 6px,#e9b95c 12px)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.onestop{margin-top:8px;font-size:13px}
+.onestop.over{color:var(--warn);font-weight:600}
+
+/* add */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:12px;flex-wrap:wrap}
+.tabs button{border:none;border-radius:8px 8px 0 0;background:transparent;color:var(--sub);padding:8px 12px}
+.tabs button.on{color:var(--ink);font-weight:600;box-shadow:inset 0 -2px 0 var(--accent)}
+.bm{display:inline-block;padding:8px 14px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font-weight:700;text-decoration:none;border:1px dashed var(--accent);cursor:grab}
+ol.steps{margin:8px 0 0;padding-left:20px;font-size:14px}
+.notice{background:var(--cand-soft);border-radius:10px;padding:10px 12px;font-size:13px;margin-top:10px}
+
+/* list */
+.listhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.listhead .tabs{border:none;margin:0}
+.pill{display:inline-block;font-size:12px;border-radius:99px;padding:0 8px;background:#f0ebe2;color:var(--sub);margin-left:4px}
+.items{display:flex;flex-direction:column;gap:8px}
+.item{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff}
+.item.done{background:linear-gradient(90deg,var(--done-soft),#fff 40%)}
+.item img,.item .noimg{width:64px;height:64px;border-radius:8px;object-fit:cover;background:#f0ebe2;display:grid;place-items:center;font-size:26px}
+.item .name{font-weight:600;font-size:14px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all}
+.item .name a{color:inherit;text-decoration:none}
+.item .name a:hover{text-decoration:underline}
+.item .meta{font-size:12px;color:var(--sub);display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:4px}
+.item .right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.item .price{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.item .price input{width:110px;text-align:right;padding:4px 8px}
+.stars button{border:none;background:none;padding:0 1px;font-size:16px;color:#d8cfc0;line-height:1}
+.stars button.on{color:#e0a100}
+.chk{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+.variant select{width:auto;max-width:220px;padding:2px 6px;font-size:12px}
+@media (max-width:640px){
+  .item{grid-template-columns:52px 1fr}
+  .item img,.item .noimg{width:52px;height:52px}
+  .item .right{grid-column:1 / -1;flex-direction:row;justify-content:space-between;align-items:center;flex-wrap:wrap}
+}
+.empty{text-align:center;color:var(--sub);padding:28px 10px;font-size:14px}
+
+/* suggestions */
+.opts{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:14px;margin-bottom:12px}
+.combos{display:grid;gap:10px}
+.combo{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.combo.best{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.combo .top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.combo .tot{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.combo .left{font-size:13px;color:var(--sub)}
+.combo ul{margin:8px 0;padding-left:18px;font-size:13px}
+.combo li{margin:2px 0}
+.combo li .p{font-variant-numeric:tabular-nums;color:var(--sub);margin-left:6px}
+.tag{font-size:11px;border-radius:4px;padding:0 5px;margin-left:4px;background:var(--accent-soft);color:var(--accent)}
+
+/* modal & toast */
+dialog{border:none;border-radius:16px;padding:0;max-width:min(520px,calc(100vw - 32px));width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(30,20,10,.4)}
+dialog .in{padding:20px}
+dialog h3{margin:0 0 10px;font-size:17px}
+.vlist{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto;margin:10px 0}
+.vlist label{display:flex;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;font-size:14px}
+.vlist label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.vlist b{font-variant-numeric:tabular-nums;white-space:nowrap}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#2a2622;color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;max-width:calc(100vw - 32px)}
+#toast.show{opacity:1;transform:translateX(-50%)}
+footer{font-size:12px;color:var(--sub);margin-top:24px;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🎁 ふるさと納税 やりくり帳<small>楽天の返礼品を貼るだけで、残り枠とおすすめの組み合わせがわかる</small></h1>
+    <select id="year" aria-label="年度" style="width:auto"></select>
+    <button id="btnSettings" class="small" title="設定・データ">⚙ 設定</button>
+  </header>
+
+  <!-- 1. 上限額 -->
+  <section class="card">
+    <h2><span class="num">1</span>今年の寄付上限額</h2>
+    <div class="row">
+      <div class="grow" style="max-width:260px">
+        <label class="f" for="limit">上限額（円）</label>
+        <input id="limit" type="number" inputmode="numeric" min="0" step="1000" placeholder="例: 65000">
+      </div>
+      <p class="muted grow" style="margin:18px 0 0">楽天や各サイトのシミュレーター、または下の「年収から目安を計算」で求めた金額を入れてください。</p>
+    </div>
+    <details id="estBox">
+      <summary>年収から目安を計算する（会社員向け・簡易）</summary>
+      <div class="grid">
+        <div><label class="f" for="eSalary">給与の年収（額面・万円）</label><input id="eSalary" type="number" inputmode="decimal" placeholder="例: 600"></div>
+        <div><label class="f" for="eSocial">社会保険料（万円）<span title="空欄なら年収の15%で概算">ⓘ</span></label><input id="eSocial" type="number" inputmode="decimal" placeholder="空欄で自動(15%)"></div>
+        <div><label class="f" for="eSpouse">配偶者控除</label>
+          <select id="eSpouse"><option value="0">なし</option><option value="1">あり（配偶者の年収 約123万円以下）</option></select></div>
+        <div><label class="f" for="eDep">扶養（16〜18歳・23歳以上）</label><input id="eDep" type="number" min="0" value="0"></div>
+        <div><label class="f" for="eDepS">扶養（19〜22歳）</label><input id="eDepS" type="number" min="0" value="0"></div>
+        <div><label class="f" for="eOther">その他の所得控除（万円）<span title="iDeCo・生命保険料控除など">ⓘ</span></label><input id="eOther" type="number" inputmode="decimal" placeholder="例: 12"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button id="btnEst" class="primary">目安を計算</button>
+        <div id="estOut" class="grow"></div>
+      </div>
+      <p class="muted" style="margin:10px 0 0">※ 給与所得のみ・住宅ローン控除や医療費控除なしの概算です。実際より少し低めに見ておくと安心です。</p>
+    </details>
+
+    <div class="sum">
+      <div><span>上限額</span><b id="sLimit">—</b></div>
+      <div><span>寄付済み</span><b id="sDone">0円</b></div>
+      <div class="rest" id="sRestBox"><span>残り枠</span><b id="sRest">—</b></div>
+      <div><span>候補の合計</span><b id="sCand">0円</b></div>
+    </div>
+    <div class="bar" aria-hidden="true"><i class="c" id="barC"></i><i class="d" id="barD"></i></div>
+    <div class="legend"><span><i style="background:var(--done)"></i>寄付済み</span><span><i style="background:var(--cand)"></i>候補を全部寄付した場合</span></div>
+    <div class="onestop" id="oneStop"></div>
+  </section>
+
+  <!-- 2. 追加 -->
+  <section class="card">
+    <h2><span class="num">2</span>返礼品を追加</h2>
+    <div class="tabs" role="tablist">
+      <button data-tab="url" class="on">URLを貼る</button>
+      <button data-tab="bm">ブックマークレット</button>
+      <button data-tab="manual">手入力</button>
+    </div>
+
+    <div data-pane="url">
+      <label class="f" for="urlIn">楽天の商品URL（アプリの「共有」で出るテキストをそのまま貼ってもOK・複数まとめて可）</label>
+      <textarea id="urlIn" rows="2" placeholder="https://item.rakuten.co.jp/f012068-kushiro/xxxx/"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="btnFetch" class="primary">取り込む</button>
+        <span id="fetchMsg" class="muted grow"></span>
+      </div>
+      <div class="notice" id="noWorker" hidden>
+        URLから自動で読み取るには「中継サーバー」の設定が必要です（⚙ 設定）。未設定の場合は、URLだけ登録して金額を手で入れるか、PCならブックマークレットが便利です。
+      </div>
+    </div>
+
+    <div data-pane="bm" hidden>
+      <p style="margin:0 0 8px">↓ このボタンをブックマークバーにドラッグして登録してください。</p>
+      <a class="bm" id="bmLink" href="#">🎁 やりくり帳に追加</a>
+      <ol class="steps">
+        <li>楽天ふるさと納税の商品ページを開く</li>
+        <li>ブックマークバーの「🎁 やりくり帳に追加」をクリック</li>
+        <li>このページに候補として追加されます（容量違いがあれば選べます）</li>
+      </ol>
+      <p class="muted" style="margin:8px 0 0">設定不要でいちばん確実な方法です（PC向け）。</p>
+    </div>
+
+    <div data-pane="manual" hidden>
+      <div class="grid">
+        <div style="grid-column:1/-1"><label class="f" for="mName">返礼品名</label><input id="mName" type="text" placeholder="例: いくら醤油漬け 500g"></div>
+        <div><label class="f" for="mShop">自治体</label><input id="mShop" type="text" placeholder="例: 北海道釧路市"></div>
+        <div><label class="f" for="mPrice">寄付額（円）</label><input id="mPrice" type="number" inputmode="numeric" step="1000" placeholder="例: 15000"></div>
+        <div style="grid-column:1/-1"><label class="f" for="mUrl">URL（任意）</label><input id="mUrl" type="url" placeholder="https://item.rakuten.co.jp/..."></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="btnManual" class="primary">候補に追加</button>
+        <label class="chk muted"><input type="checkbox" id="mDone"> 寄付済みとして追加</label>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. リスト -->
+  <section class="card">
+    <h2><span class="num">3</span>リスト</h2>
+    <div class="listhead">
+      <div class="tabs" role="tablist" id="listTabs">
+        <button data-list="cand" class="on">候補<span class="pill" id="cCand">0</span></button>
+        <button data-list="done">寄付済み<span class="pill" id="cDone">0</span></button>
+      </div>
+      <span class="grow"></span>
+      <select id="sort" style="width:auto" aria-label="並び順">
+        <option value="new">追加が新しい順</option>
+        <option value="price">金額が高い順</option>
+        <option value="priceAsc">金額が安い順</option>
+        <option value="stars">欲しい度順</option>
+        <option value="shop">自治体順</option>
+      </select>
+    </div>
+    <div class="items" id="items"></div>
+    <p class="muted" id="listHint" style="margin:10px 0 0">★＝欲しい度（組み合わせ提案で優先されます）。「必ず入れる」にチェックした候補は提案に必ず含まれます。</p>
+  </section>
+
+  <!-- 4. 提案 -->
+  <section class="card">
+    <h2><span class="num">4</span>組み合わせを提案</h2>
+    <p class="muted" style="margin:-4px 0 12px" id="sugLead">残り枠の中で、候補からおすすめの組み合わせを探します。</p>
+    <div class="opts">
+      <label class="chk"><input type="radio" name="mode" value="fill" checked> 枠を使い切る重視</label>
+      <label class="chk"><input type="radio" name="mode" value="love"> 欲しい度重視</label>
+      <label class="chk"><input type="checkbox" id="optOneStop" checked> ワンストップ特例（5自治体まで）</label>
+      <label class="chk"><input type="checkbox" id="optMulti"> 同じ品を複数口OK（最大3口）</label>
+    </div>
+    <button id="btnSuggest" class="primary">組み合わせを計算</button>
+    <div class="combos" id="combos" style="margin-top:14px"></div>
+  </section>
+
+  <footer>
+    データはこのブラウザの中だけに保存されます（サーバーには送信されません）。別の端末に移すときは ⚙ 設定 から書き出し／読み込みしてください。<br>
+    上限額の目安計算は簡易的なものです。正確な金額は源泉徴収票をもとにシミュレーターでご確認ください。楽天の商品情報は取り込み時点のもので、価格が変わることがあります。
+  </footer>
+</div>
+
+<!-- バリエーション選択 -->
+<dialog id="dlgVar"><form method="dialog" class="in">
+  <h3>容量・種類を選んでください</h3>
+  <div class="muted" id="dvName"></div>
+  <div class="vlist" id="dvList"></div>
+  <div class="row" style="justify-content:flex-end">
+    <button value="cancel" class="ghost">キャンセル</button>
+    <button value="ok" class="primary">追加</button>
+  </div>
+</form></dialog>
+
+<!-- 設定 -->
+<dialog id="dlgSet"><form method="dialog" class="in">
+  <h3>⚙ 設定・データ</h3>
+  <label class="f" for="setWorker">中継サーバーのURL（URL貼り付けで自動取得する場合）</label>
+  <input id="setWorker" type="url" placeholder="https://furusato-proxy.xxxx.workers.dev">
+  <p class="muted" style="margin:6px 0 14px">設置方法は README を参照。空欄でもブックマークレットと手入力は使えます。</p>
+  <div class="row">
+    <button type="button" id="btnExport">データを書き出す</button>
+    <button type="button" id="btnImport">データを読み込む</button>
+    <input type="file" id="fileImport" accept="application/json" hidden>
+  </div>
+  <div class="row" style="margin-top:14px">
+    <button type="button" id="btnClearYear" class="ghost" style="color:var(--warn)">この年度のデータを消去</button>
+  </div>
+  <div class="row" style="justify-content:flex-end;margin-top:10px">
+    <button value="close" class="primary">閉じる</button>
+  </div>
+</form></dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+ * 楽天商品ページ解析（ブックマークレットでもこの関数をそのまま使う）
+ * ============================================================ */
+function parseRakuten(html, url) {
+  function dec(s) {
+    return String(s || "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+      .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#(\d+);/g, function (m, n) { return String.fromCharCode(+n); });
+  }
+  function meta(re) { var m = html.match(re); return m ? dec(m[1]) : ""; }
+  function unjson(s) { try { return JSON.parse('"' + s + '"'); } catch (e) { return s; } }
+  var name = meta(/<meta\s+itemprop="name"\s+content="([^"]*)"/) || meta(/<meta\s+property="og:title"\s+content="([^"]*)"/);
+  var price = parseInt(meta(/<meta\s+itemprop="price"\s+content="([\d.]+)"/), 10) || 0;
+  var image = meta(/<meta\s+property="og:image"\s+content="([^"]*)"/);
+  var sm = html.match(/"shopName"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  var shop = sm ? unjson(sm[1]) : "";
+  var pm = name.match(/[｜|]([^｜|]+)$/);
+  if (!shop && pm) shop = pm[1];
+  if (pm && shop && pm[1].trim() === shop.trim()) name = name.slice(0, pm.index);
+  name = name.replace(/^【楽天市場】/, "").trim();
+  var variants = [], seen = {};
+  var re = /"variantId"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"selectorValues"\s*:\s*\[((?:[^\]"]|"(?:[^"\\]|\\.)*")*)\]((?:(?!"variantId")[\s\S]){0,4000}?)"taxIncludedPrice"\s*:\s*([\d.]+)/g, m;
+  while ((m = re.exec(html))) {
+    if (seen[m[1]]) continue;
+    seen[m[1]] = 1;
+    if (/"hidden"\s*:\s*true/.test(m[3])) continue;
+    var labels = (m[2].match(/"(?:[^"\\]|\\.)*"/g) || []).map(function (x) { return unjson(x.slice(1, -1)); });
+    variants.push({ label: labels.join(" / ") || m[1], price: Math.round(+m[4]) });
+  }
+  var cm = String(url).match(/item\.rakuten\.co\.jp\/([^\/?#]+)\/([^\/?#]+)/);
+  return {
+    name: name, shop: shop, price: price, image: image,
+    url: cm ? "https://item.rakuten.co.jp/" + cm[1] + "/" + cm[2] + "/" : String(url),
+    variants: variants.length > 1 ? variants : []
+  };
+}
+
+/* ============================================================
+ * 状態
+ * ============================================================ */
+// 公開する人が中継サーバー（worker.js）を用意したら、ここにURLを書くと全員が最初から自動取得を使える
+const DEFAULT_WORKER_URL = "";
+const KEY = "furusato-yarikuri-v1";
+const THIS_YEAR = new Date().getFullYear();
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const yen = n => (Math.round(n) || 0).toLocaleString("ja-JP") + "円";
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+let store = load();
+let year = String(store.lastYear || THIS_YEAR);
+let listView = "cand";
+
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.years) return s; } catch (e) {}
+  return { years: {}, settings: { workerUrl: "" } };
+}
+function save() {
+  store.lastYear = year;
+  try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { toast("保存できませんでした（ブラウザの設定を確認してください）"); }
+}
+function Y() {
+  if (!store.years[year]) store.years[year] = { limit: 0, items: [] };
+  return store.years[year];
+}
+
+/* ============================================================
+ * 上限額の目安（2026年分・給与所得のみの簡易計算）
+ * ============================================================ */
+function kyuyoKojo(s) { // 給与所得控除（令和7年分以降）
+  if (s <= 1900000) return Math.min(s, 650000);
+  if (s <= 3600000) return s * 0.3 + 80000;
+  if (s <= 6600000) return s * 0.2 + 440000;
+  if (s <= 8500000) return s * 0.1 + 1100000;
+  return 1950000;
+}
+function kisoShotoku(income) { // 所得税の基礎控除（令和7・8年分）
+  if (income <= 1320000) return 950000;
+  if (income <= 3360000) return 880000;
+  if (income <= 4890000) return 680000;
+  if (income <= 6550000) return 630000;
+  if (income <= 23500000) return 580000;
+  if (income <= 24000000) return 480000;
+  if (income <= 24500000) return 320000;
+  if (income <= 25000000) return 160000;
+  return 0;
+}
+function kisoJumin(income) {
+  if (income <= 24000000) return 430000;
+  if (income <= 24500000) return 290000;
+  if (income <= 25000000) return 150000;
+  return 0;
+}
+function incomeTaxRate(t) {
+  if (t <= 1949000) return 0.05;
+  if (t <= 3299000) return 0.10;
+  if (t <= 6949000) return 0.20;
+  if (t <= 8999000) return 0.23;
+  if (t <= 17999000) return 0.33;
+  if (t <= 39999000) return 0.40;
+  return 0.45;
+}
+function estimateLimit(o) {
+  const salary = o.salary;
+  const income = Math.max(0, salary - kyuyoKojo(salary));
+  const social = o.social != null ? o.social : Math.round(salary * 0.15);
+  const spouse = o.spouse && income <= 10000000;
+  const common = social + o.other;
+  const dedI = common + kisoShotoku(income) + (spouse ? 380000 : 0) + o.dep * 380000 + o.depS * 630000;
+  const dedJ = common + kisoJumin(income) + (spouse ? 330000 : 0) + o.dep * 330000 + o.depS * 450000;
+  const taxableI = Math.max(0, Math.floor((income - dedI) / 1000) * 1000);
+  const taxableJ = Math.max(0, Math.floor((income - dedJ) / 1000) * 1000);
+  const shotokuwari = taxableJ * 0.10;
+  const rate = incomeTaxRate(taxableI);
+  const limit = shotokuwari * 0.2 / (0.9 - rate * 1.021) + 2000;
+  return { limit: Math.max(0, Math.floor(limit / 1000) * 1000), rate, taxableI, taxableJ };
+}
+
+/* ============================================================
+ * 描画
+ * ============================================================ */
+function render() {
+  const d = Y();
+  const done = d.items.filter(i => i.status === "done");
+  const cand = d.items.filter(i => i.status !== "done");
+  const doneSum = done.reduce((a, i) => a + i.price, 0);
+  const candSum = cand.reduce((a, i) => a + i.price, 0);
+  const limit = d.limit || 0;
+  const rest = limit - doneSum;
+
+  if (document.activeElement !== $("#limit")) $("#limit").value = limit || "";
+  $("#sLimit").textContent = limit ? yen(limit) : "未入力";
+  $("#sDone").textContent = yen(doneSum);
+  $("#sRest").textContent = limit ? (rest < 0 ? "−" + yen(-rest) : yen(rest)) : "—";
+  $("#sRestBox").classList.toggle("over", limit > 0 && rest < 0);
+  $("#sCand").textContent = yen(candSum);
+  const base = Math.max(limit, doneSum + candSum, 1);
+  $("#barD").style.width = (doneSum / base * 100) + "%";
+  $("#barC").style.width = Math.min(100, (doneSum + candSum) / base * 100) + "%";
+  const bar = $(".bar");
+  bar.style.boxShadow = limit && doneSum + candSum > limit ? "inset -3px 0 0 var(--warn)" : "";
+
+  const towns = new Set(done.map(i => normShop(i.shop)).filter(Boolean));
+  const os = $("#oneStop");
+  if (towns.size) {
+    os.textContent = `寄付済みの自治体：${towns.size} / 5` + (towns.size > 5 ? "（6自治体以上はワンストップ特例が使えません。確定申告が必要です）" : towns.size === 5 ? "（ワンストップ特例はここまで）" : "（ワンストップ特例は5自治体まで）");
+    os.classList.toggle("over", towns.size > 5);
+  } else os.textContent = "";
+
+  $("#cCand").textContent = cand.length;
+  $("#cDone").textContent = done.length;
+  $$("#listTabs button").forEach(b => b.classList.toggle("on", b.dataset.list === listView));
+  $("#sugLead").textContent = limit
+    ? `残り枠 ${yen(Math.max(rest, 0))} の中で、候補 ${cand.length} 件からおすすめの組み合わせを探します。`
+    : "まず上限額を入力してください。";
+  renderList(listView === "done" ? done : cand);
+}
+
+function normShop(s) { return String(s || "").replace(/\s/g, ""); }
+
+function renderList(arr) {
+  const box = $("#items");
+  const sort = $("#sort").value;
+  const sorted = [...arr];
+  if (sort === "price") sorted.sort((a, b) => b.price - a.price);
+  else if (sort === "priceAsc") sorted.sort((a, b) => a.price - b.price);
+  else if (sort === "stars") sorted.sort((a, b) => b.stars - a.stars || b.price - a.price);
+  else if (sort === "shop") sorted.sort((a, b) => (a.shop || "").localeCompare(b.shop || "", "ja"));
+  else sorted.sort((a, b) => b.added - a.added);
+
+  if (!sorted.length) {
+    box.innerHTML = `<div class="empty">${listView === "done" ? "まだ寄付済みの返礼品はありません" : "候補はまだありません。上の「返礼品を追加」から登録してください"}</div>`;
+    return;
+  }
+  box.innerHTML = "";
+  for (const it of sorted) {
+    const el = document.createElement("div");
+    el.className = "item" + (it.status === "done" ? " done" : "");
+    el.dataset.id = it.id;
+    const img = it.image ? `<img src="${esc(it.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<div class="noimg">🎁</div>`;
+    const label = esc(String(it.name || "(名称未設定)").replace(/^【ふるさと納税】/, ""));
+    const nameHtml = it.url ? `<a href="${esc(it.url)}" target="_blank" rel="noopener" title="${esc(it.name)}">${label}</a>` : label;
+    const variant = it.variants && it.variants.length > 1
+      ? `<span class="variant"><select data-act="variant" aria-label="容量・種類">${it.variants.map((v, i) => `<option value="${i}" ${v.label === it.variantLabel ? "selected" : ""}>${esc(v.label)}（${yen(v.price)}）</option>`).join("")}</select></span>` : "";
+    const stars = `<span class="stars" aria-label="欲しい度">${[1, 2, 3].map(n => `<button type="button" data-act="star" data-n="${n}" class="${n <= it.stars ? "on" : ""}" title="欲しい度 ${n}">★</button>`).join("")}</span>`;
+    el.innerHTML = `
+      ${img}
+      <div style="min-width:0">
+        <div class="name">${nameHtml}</div>
+        <div class="meta">
+          <span>📍 <span data-act="shop" title="クリックで編集" style="cursor:pointer">${esc(it.shop || "自治体未設定")}</span></span>
+          ${variant}
+          ${it.status === "done" ? `<span>寄付日 ${esc(it.doneDate || "")}</span>` : stars}
+          ${it.status !== "done" ? `<label class="chk"><input type="checkbox" data-act="must" ${it.must ? "checked" : ""}>必ず入れる</label>` : ""}
+        </div>
+      </div>
+      <div class="right">
+        <div class="price"><input type="number" inputmode="numeric" step="1000" value="${it.price}" data-act="price" aria-label="寄付額">円</div>
+        <div class="row" style="gap:4px">
+          ${it.status === "done"
+            ? `<button type="button" class="small" data-act="undo">候補に戻す</button>`
+            : `<button type="button" class="small" data-act="done" style="color:var(--done);border-color:var(--done)">✓ 寄付した</button>`}
+          <button type="button" class="small ghost" data-act="del" title="削除">🗑</button>
+        </div>
+      </div>`;
+    box.appendChild(el);
+  }
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+function toast(msg, ms = 2600) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), ms);
+}
+
+/* ============================================================
+ * 追加処理
+ * ============================================================ */
+function addItem(data, opts = {}) {
+  const d = Y();
+  if (data.url) {
+    const dup = d.items.find(i => i.url && i.url === data.url && (!data.variantLabel || i.variantLabel === data.variantLabel));
+    if (dup && !opts.allowDup) {
+      if (!confirm(`「${(dup.name || "").slice(0, 30)}」はすでに登録されています。もう1件追加しますか？`)) return null;
+    }
+  }
+  const it = {
+    id: uid(), name: data.name || "", shop: data.shop || "", price: Math.max(0, Math.round(+data.price || 0)),
+    url: data.url || "", image: data.image || "", variants: data.variants || [], variantLabel: data.variantLabel || "",
+    status: opts.done ? "done" : "cand", stars: 2, must: false, added: Date.now(),
+    doneDate: opts.done ? today() : ""
+  };
+  d.items.push(it);
+  save();
+  listView = it.status === "done" ? "done" : "cand";
+  render();
+  return it;
+}
+function today() { const t = new Date(); return `${t.getFullYear()}/${t.getMonth() + 1}/${t.getDate()}`; }
+
+// バリエーションがあれば選ばせてから追加
+function addParsed(p) {
+  return new Promise(resolve => {
+    if (!p.variants || p.variants.length < 2) {
+      resolve(addItem(p));
+      return;
+    }
+    const dlg = $("#dlgVar");
+    $("#dvName").textContent = p.name;
+    const vs = p.variants;
+    const def = Math.max(0, vs.findIndex(v => v.price === p.price));
+    $("#dvList").innerHTML = vs.map((v, i) => `<label><span><input type="radio" name="dv" value="${i}" ${i === def ? "checked" : ""}> ${esc(v.label)}</span><b>${yen(v.price)}</b></label>`).join("");
+    dlg.returnValue = "";
+    dlg.onclose = () => {
+      if (dlg.returnValue !== "ok") { resolve(null); return; }
+      const i = +($("input[name=dv]:checked", dlg) || { value: def }).value;
+      resolve(addItem({ ...p, price: vs[i].price, variantLabel: vs[i].label }));
+    };
+    dlg.showModal();
+  });
+}
+
+function workerUrl() { return ((store.settings && store.settings.workerUrl) || DEFAULT_WORKER_URL || "").trim(); }
+
+function extractUrls(text) {
+  const urls = (text.match(/https?:\/\/[^\s"'<>　]+/g) || [])
+    .filter(u => /(^https?:\/\/(item\.rakuten\.co\.jp|a\.r10\.to|r10\.to|hb\.afl\.rakuten\.co\.jp)\/)/.test(u));
+  return [...new Set(urls)];
+}
+
+async function fetchViaWorker(u) {
+  const w = workerUrl().replace(/\/$/, "");
+  const res = await fetch(w + "/?url=" + encodeURIComponent(u));
+  if (!res.ok) throw new Error((await res.text()).slice(0, 120) || ("HTTP " + res.status));
+  const buf = await res.arrayBuffer();
+  const ct = res.headers.get("Content-Type") || "";
+  const cs = (ct.match(/charset=([\w-]+)/i) || [, "euc-jp"])[1];
+  let html;
+  try { html = new TextDecoder(cs).decode(buf); } catch (e) { html = new TextDecoder("euc-jp").decode(buf); }
+  const finalUrl = res.headers.get("X-Final-Url") || u;
+  const p = parseRakuten(html, finalUrl);
+  if (!p.price && !p.name) throw new Error("商品情報を読み取れませんでした");
+  return p;
+}
+
+async function onFetch() {
+  const text = $("#urlIn").value;
+  const urls = extractUrls(text);
+  const msg = $("#fetchMsg");
+  if (!urls.length) { msg.textContent = "楽天の商品URLが見つかりませんでした"; return; }
+  const hasWorker = !!workerUrl();
+  if (!hasWorker) {
+    $("#noWorker").hidden = false;
+    let n = 0;
+    for (const u of urls) {
+      const cm = u.match(/item\.rakuten\.co\.jp\/([^\/?#]+)\/([^\/?#]+)/);
+      const price = prompt(`金額を入力してください（中継サーバー未設定のため自動取得できません）\n${u}`, "");
+      if (price === null) continue;
+      if (addItem({ url: cm ? `https://item.rakuten.co.jp/${cm[1]}/${cm[2]}/` : u, name: cm ? cm[2] : "楽天の返礼品", price: +price.replace(/[^\d]/g, "") })) n++;
+    }
+    if (n) { toast(`${n}件追加しました。商品名や自治体はリストでクリックして編集できます`); $("#urlIn").value = ""; }
+    return;
+  }
+  $("#btnFetch").disabled = true;
+  let ok = 0, ng = 0;
+  for (let k = 0; k < urls.length; k++) {
+    msg.textContent = `読み込み中… (${k + 1}/${urls.length})`;
+    try {
+      const p = await fetchViaWorker(urls[k]);
+      if (await addParsed(p)) ok++;
+    } catch (e) {
+      ng++;
+      console.warn(urls[k], e);
+    }
+  }
+  $("#btnFetch").disabled = false;
+  msg.textContent = ng ? `${ok}件追加、${ng}件は読み取れませんでした（URLや中継サーバーの設定を確認）` : "";
+  if (ok) { toast(`${ok}件追加しました`); if (!ng) $("#urlIn").value = ""; }
+}
+
+// スマホの「共有」から ?text=... で渡される（ホーム画面に追加したとき）
+function consumeShare() {
+  const q = new URLSearchParams(location.search);
+  const text = [q.get("url"), q.get("text"), q.get("title")].filter(Boolean).join(" ");
+  if (!text) return;
+  history.replaceState(null, "", location.pathname);
+  if (!extractUrls(text).length) { toast("楽天の商品URLが見つかりませんでした"); return; }
+  $("#urlIn").value = text;
+  $$("[data-tab]").forEach(b => b.classList.toggle("on", b.dataset.tab === "url"));
+  $$("[data-pane]").forEach(p => p.hidden = p.dataset.pane !== "url");
+  onFetch();
+}
+
+// ブックマークレットから #add=... で渡される
+async function consumeHash() {
+  const m = location.hash.match(/^#add=(.+)$/);
+  if (!m) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  try {
+    const p = JSON.parse(decodeURIComponent(m[1]));
+    if (!p || (!p.name && !p.price)) throw 0;
+    const it = await addParsed(p);
+    if (it) toast(`追加しました：${(it.name || "").slice(0, 24)}…`);
+  } catch (e) {
+    toast("商品情報を読み取れませんでした。楽天の商品ページで実行してください");
+  }
+}
+
+function buildBookmarklet() {
+  const tool = location.href.split("#")[0];
+  const code = `(function(){if(!/item\\.rakuten\\.co\\.jp/.test(location.host)){alert("楽天市場の商品ページで実行してください");return}var P=${parseRakuten.toString()};var d=P(document.documentElement.outerHTML,location.href);if(!d.price&&!d.name){alert("商品情報を読み取れませんでした");return}window.open(${JSON.stringify(tool)}+"#add="+encodeURIComponent(JSON.stringify(d)),"furusato-yarikuri")})()`;
+  $("#bmLink").href = "javascript:" + encodeURIComponent(code);
+  window.name = "furusato-yarikuri";
+}
+
+/* ============================================================
+ * 組み合わせ提案（上位K件を保持するナップサックDP）
+ * ============================================================ */
+function suggest() {
+  const d = Y();
+  const out = $("#combos");
+  if (!d.limit) { out.innerHTML = `<div class="empty">上限額を入力してください</div>`; return; }
+  const done = d.items.filter(i => i.status === "done");
+  const cand = d.items.filter(i => i.status !== "done" && i.price > 0);
+  const rest = d.limit - done.reduce((a, i) => a + i.price, 0);
+  if (rest <= 0) { out.innerHTML = `<div class="empty">残り枠がありません 🎉</div>`; return; }
+  if (!cand.length) { out.innerHTML = `<div class="empty">候補がありません。返礼品を追加してください</div>`; return; }
+
+  const mode = $("input[name=mode]:checked").value;
+  const oneStop = $("#optOneStop").checked;
+  const maxQty = $("#optMulti").checked ? 3 : 1;
+  const must = cand.filter(i => i.must);
+  const opt = cand.filter(i => !i.must);
+  const mustSum = must.reduce((a, i) => a + i.price, 0);
+  const R = rest - mustSum;
+  if (R < 0) { out.innerHTML = `<div class="empty">「必ず入れる」の合計 ${yen(mustSum)} が残り枠 ${yen(rest)} を超えています</div>`; return; }
+
+  const doneTowns = new Set(done.map(i => normShop(i.shop)).filter(Boolean));
+  const mustTowns = new Set([...doneTowns, ...must.map(i => normShop(i.shop)).filter(Boolean)]);
+  if (oneStop && mustTowns.size > 5) { out.innerHTML = `<div class="empty">寄付済み＋必ず入れる だけで6自治体以上になっています。ワンストップ特例のチェックを外して計算してください</div>`; return; }
+
+  // 金額の刻み（計算量を抑えるため）。切り上げるので上限を超えることはない
+  const gcd = (a, b) => b ? gcd(b, a % b) : a;
+  let unit = opt.reduce((g, i) => gcd(g, i.price), 0) || 1000;
+  const MAXS = 6000;
+  if (R / unit > MAXS) unit = Math.ceil(R / MAXS / 100) * 100;
+  const S = Math.floor(R / unit);
+  const w = opt.map(i => Math.ceil(i.price / unit));
+  const love = opt.map(i => [0, 1, 2.5, 5][i.stars || 2]);
+  const K = 10;
+  const BITS = 2n;
+
+  // dp[s] = [{m: BigInt(各品の口数), sc: 欲しい度合計}] 上位K件
+  let dp = new Array(S + 1).fill(null);
+  dp[0] = [{ m: 0n, sc: 0 }];
+  const better = mode === "love" ? (a, b) => b.sc - a.sc : (a, b) => b.sc - a.sc;
+  for (let j = 0; j < opt.length; j++) {
+    if (w[j] > S) continue;
+    const prev = dp.slice();
+    const shift = BigInt(j) * BITS;
+    for (let s = w[j]; s <= S; s++) {
+      for (let q = 1; q <= maxQty && q * w[j] <= s; q++) {
+        const src = prev[s - q * w[j]];
+        if (!src) continue;
+        let cur = dp[s] === prev[s] ? (dp[s] ? dp[s].slice() : []) : dp[s];
+        for (const e of src) {
+          const c = { m: e.m | (BigInt(q) << shift), sc: e.sc + love[j] * q };
+          if (cur.length >= K && cur[cur.length - 1].sc >= c.sc) continue;
+          cur.push(c);
+          cur.sort(better);
+          if (cur.length > K) cur.length = K;
+        }
+        dp[s] = cur;
+      }
+    }
+  }
+
+  // 候補の組み合わせを集める
+  const results = [];
+  for (let s = S; s >= 0 && results.length < 400; s--) {
+    if (!dp[s]) continue;
+    for (const e of dp[s]) {
+      const picks = [];
+      let total = mustSum, sc = 0;
+      for (let j = 0; j < opt.length; j++) {
+        const q = Number((e.m >> (BigInt(j) * BITS)) & 3n);
+        if (q) { picks.push({ it: opt[j], q }); total += opt[j].price * q; sc += love[j] * q; }
+      }
+      must.forEach(it => { sc += [0, 1, 2.5, 5][it.stars || 2]; });
+      if (total > rest) continue;
+      if (!picks.length && !must.length) continue;
+      if (oneStop) {
+        const towns = new Set(mustTowns);
+        picks.forEach(p => { const t = normShop(p.it.shop); if (t) towns.add(t); });
+        if (towns.size > 5) continue;
+      }
+      results.push({ picks, total, sc, left: rest - total });
+    }
+  }
+  if (!results.length) { out.innerHTML = `<div class="empty">残り枠 ${yen(rest)} に収まる組み合わせが見つかりませんでした</div>`; return; }
+
+  if (mode === "love") results.sort((a, b) => b.sc - a.sc || b.total - a.total);
+  else results.sort((a, b) => b.total - a.total || b.sc - a.sc);
+  const top = results.slice(0, 5);
+
+  out.innerHTML = top.map((r, idx) => {
+    const lines = [
+      ...must.map(it => `<li>${esc(short(it.name))}<span class="tag">必ず</span><span class="p">${yen(it.price)}・${esc(it.shop || "")}</span></li>`),
+      ...r.picks.map(p => `<li>${esc(short(p.it.name))}${p.q > 1 ? `<span class="tag">×${p.q}口</span>` : ""}<span class="p">${yen(p.it.price * p.q)}・${esc(p.it.shop || "")}</span></li>`)
+    ].join("");
+    const towns = new Set([...doneTowns, ...must.map(i => normShop(i.shop)), ...r.picks.map(p => normShop(p.it.shop))].filter(Boolean));
+    return `<div class="combo ${idx === 0 ? "best" : ""}">
+      <div class="top"><span class="tot">${idx === 0 ? "👑 " : ""}合計 ${yen(r.total)}</span><span class="left">余り ${yen(r.left)}・${r.picks.length + must.length}品・自治体計 ${towns.size}</span></div>
+      <ul>${lines}</ul>
+      <button class="small" data-apply="${idx}">この組み合わせで寄付した</button>
+    </div>`;
+  }).join("");
+  out._top = top;
+  out._must = must;
+}
+function short(s) { s = String(s || "").replace(/^【ふるさと納税】/, ""); return s.length > 48 ? s.slice(0, 48) + "…" : s; }
+
+/* ============================================================
+ * イベント
+ * ============================================================ */
+function init() {
+  // 年度
+  const years = new Set([THIS_YEAR - 1, THIS_YEAR, THIS_YEAR + 1, ...Object.keys(store.years).map(Number)]);
+  $("#year").innerHTML = [...years].sort().map(y => `<option value="${y}">${y}年</option>`).join("");
+  $("#year").value = year;
+  $("#year").onchange = e => { year = e.target.value; save(); $("#combos").innerHTML = ""; render(); };
+
+  $("#limit").oninput = e => { Y().limit = Math.max(0, +e.target.value || 0); save(); render(); };
+
+  $("#btnEst").onclick = () => {
+    const n = id => { const v = $(id).value.trim(); return v === "" ? null : +v; };
+    const salary = n("#eSalary");
+    if (!salary) { $("#estOut").textContent = "年収を入力してください"; return; }
+    const r = estimateLimit({
+      salary: salary * 10000,
+      social: n("#eSocial") != null ? n("#eSocial") * 10000 : null,
+      spouse: $("#eSpouse").value === "1",
+      dep: n("#eDep") || 0, depS: n("#eDepS") || 0,
+      other: (n("#eOther") || 0) * 10000
+    });
+    $("#estOut").innerHTML = `目安 <b style="font-size:18px">${yen(r.limit)}</b> <span class="muted">（所得税率 ${Math.round(r.rate * 100)}%）</span> <button class="small" id="btnUseEst">上限額に反映</button>`;
+    $("#btnUseEst").onclick = () => { Y().limit = r.limit; save(); render(); toast("上限額に反映しました"); };
+  };
+
+  // 追加タブ
+  $$("[data-tab]").forEach(b => b.onclick = () => {
+    $$("[data-tab]").forEach(x => x.classList.toggle("on", x === b));
+    $$("[data-pane]").forEach(p => p.hidden = p.dataset.pane !== b.dataset.tab);
+  });
+  $("#btnFetch").onclick = onFetch;
+  $("#btnManual").onclick = () => {
+    const price = +$("#mPrice").value;
+    if (!$("#mName").value.trim() || !price) { toast("返礼品名と寄付額を入力してください"); return; }
+    addItem({ name: $("#mName").value.trim(), shop: $("#mShop").value.trim(), price, url: $("#mUrl").value.trim() }, { done: $("#mDone").checked });
+    ["#mName", "#mShop", "#mPrice", "#mUrl"].forEach(s => $(s).value = "");
+    toast("追加しました");
+  };
+  $("#bmLink").onclick = e => { e.preventDefault(); toast("クリックではなく、ブックマークバーにドラッグして登録してください", 4000); };
+
+  // リスト
+  $$("#listTabs button").forEach(b => b.onclick = () => { listView = b.dataset.list; render(); });
+  $("#sort").onchange = render;
+  const box = $("#items");
+  box.addEventListener("click", e => {
+    const t = e.target.closest("[data-act]");
+    if (!t) return;
+    const it = Y().items.find(i => i.id === t.closest(".item").dataset.id);
+    if (!it) return;
+    const a = t.dataset.act;
+    if (a === "star") { it.stars = +t.dataset.n; }
+    else if (a === "done") { it.status = "done"; it.must = false; it.doneDate = today(); toast("寄付済みにしました"); }
+    else if (a === "undo") { it.status = "cand"; }
+    else if (a === "del") { if (!confirm("削除しますか？")) return; Y().items = Y().items.filter(i => i !== it); }
+    else if (a === "shop") {
+      const v = prompt("自治体名", it.shop || ""); if (v === null) return; it.shop = v.trim();
+      const nv = prompt("返礼品名", it.name || ""); if (nv !== null && nv.trim()) it.name = nv.trim();
+    }
+    else return;
+    save(); render();
+  });
+  box.addEventListener("change", e => {
+    const t = e.target.closest("[data-act]");
+    if (!t) return;
+    const it = Y().items.find(i => i.id === t.closest(".item").dataset.id);
+    if (!it) return;
+    const a = t.dataset.act;
+    if (a === "price") it.price = Math.max(0, Math.round(+t.value || 0));
+    else if (a === "must") it.must = t.checked;
+    else if (a === "variant") { const v = it.variants[+t.value]; it.price = v.price; it.variantLabel = v.label; }
+    save(); render();
+  });
+
+  // 提案
+  $("#btnSuggest").onclick = () => {
+    const b = $("#btnSuggest");
+    b.disabled = true; b.textContent = "計算中…";
+    setTimeout(() => { try { suggest(); } finally { b.disabled = false; b.textContent = "組み合わせを計算"; } }, 30);
+  };
+  $("#combos").addEventListener("click", e => {
+    const b = e.target.closest("[data-apply]");
+    if (!b) return;
+    const r = $("#combos")._top[+b.dataset.apply];
+    if (!confirm("この組み合わせの返礼品を「寄付済み」にしますか？\n（楽天での寄付手続きはご自身で行ってください）")) return;
+    const d = Y();
+    const mk = it => { it.status = "done"; it.must = false; it.doneDate = today(); };
+    $("#combos")._must.forEach(mk);
+    for (const p of r.picks) {
+      mk(p.it);
+      for (let k = 1; k < p.q; k++) d.items.push({ ...p.it, id: uid(), added: Date.now() + k });
+    }
+    save(); listView = "done"; render();
+    $("#combos").innerHTML = "";
+    toast("寄付済みに移動しました");
+  });
+
+  // 設定
+  $("#btnSettings").onclick = () => { $("#setWorker").value = store.settings.workerUrl || ""; $("#dlgSet").showModal(); };
+  $("#dlgSet").addEventListener("close", () => { store.settings.workerUrl = $("#setWorker").value.trim(); save(); $("#noWorker").hidden = true; });
+  $("#btnExport").onclick = () => {
+    const blob = new Blob([JSON.stringify(store, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `furusato-yarikuri-${today().replace(/\//g, "")}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  $("#btnImport").onclick = () => $("#fileImport").click();
+  $("#fileImport").onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const s = JSON.parse(await f.text());
+      if (!s.years) throw 0;
+      if (!confirm("今のデータを読み込んだデータで置き換えます。よろしいですか？")) return;
+      store = { settings: { workerUrl: "" }, ...s };
+      year = String(store.lastYear || THIS_YEAR);
+      save(); location.reload();
+    } catch (err) { toast("読み込めませんでした（形式が違います）"); }
+    e.target.value = "";
+  };
+  $("#btnClearYear").onclick = () => {
+    if (!confirm(`${year}年のデータ（上限額・リスト）をすべて消去します。よろしいですか？`)) return;
+    delete store.years[year]; save(); $("#dlgSet").close(); render();
+  };
+
+  buildBookmarklet();
+  render();
+  consumeHash();
+  consumeShare();
+  if (location.protocol.startsWith("http") && "serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+}
+window.addEventListener("hashchange", consumeHash);
+init();
+</script>
+</body>
+</html>
