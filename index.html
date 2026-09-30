@@ -228,6 +228,7 @@ footer{font-size:12px;color:var(--sub);margin-top:24px;line-height:1.8}
         <button data-list="done">寄付済み<span class="pill" id="cDone">0</span></button>
       </div>
       <span class="grow"></span>
+      <button id="btnBackfill" class="small" title="登録済みのURLから商品名・自治体・画像を取得します">🔄 商品名を取得</button>
       <select id="sort" style="width:auto" aria-label="並び順">
         <option value="new">追加が新しい順</option>
         <option value="price">金額が高い順</option>
@@ -333,7 +334,7 @@ function parseRakuten(html, url) {
  * 状態
  * ============================================================ */
 // 公開する人が中継サーバー（worker.js）を用意したら、ここにURLを書くと全員が最初から自動取得を使える
-const DEFAULT_WORKER_URL = "";
+const DEFAULT_WORKER_URL = "https://furusato-prox.wmwmu-fal.workers.dev";
 const KEY = "furusato-yarikuri-v1";
 const THIS_YEAR = new Date().getFullYear();
 const $ = (s, el = document) => el.querySelector(s);
@@ -518,6 +519,12 @@ function addItem(data, opts = {}) {
   const d = Y();
   if (data.url) {
     const dup = d.items.find(i => i.url && i.url === data.url && (!data.variantLabel || i.variantLabel === data.variantLabel));
+    // 商品コードのまま登録されていた同じURLは、重複させずに中身を埋める
+    if (dup && !opts.allowDup && data.name && isPlaceholderName(dup.name) && !isPlaceholderName(data.name)) {
+      fillFromParsed(dup, data);
+      save(); render();
+      return dup;
+    }
     if (dup && !opts.allowDup) {
       if (!confirm(`「${(dup.name || "").slice(0, 30)}」はすでに登録されています。もう1件追加しますか？`)) return null;
     }
@@ -535,6 +542,50 @@ function addItem(data, opts = {}) {
   return it;
 }
 function today() { const t = new Date(); return `${t.getFullYear()}/${t.getMonth() + 1}/${t.getDate()}`; }
+
+// 商品名が「1490608」のような商品コードのままか（日本語が1文字もなければ未取得とみなす）
+function isPlaceholderName(s) { return !/[぀-ヿ一-鿿]/.test(String(s || "")); }
+
+// 取得した情報を既存の1件に反映（金額は自分で入れた値を優先して残す）
+function fillFromParsed(it, p) {
+  if (p.name) it.name = p.name;
+  if (p.shop) it.shop = p.shop;
+  if (p.image) it.image = p.image;
+  if (p.variants && p.variants.length > 1) {
+    it.variants = p.variants;
+    const hit = p.variants.find(v => v.price === it.price);
+    if (hit) it.variantLabel = hit.label;
+  }
+  if (!it.price) it.price = p.price || 0;
+}
+
+// 登録済みURLから商品名・自治体・画像をまとめて取得する
+async function backfill() {
+  const btn = $("#btnBackfill");
+  if (!workerUrl()) {
+    toast("URLからの取得には中継サーバーの設定が必要です（⚙ 設定）", 4000);
+    $("#setWorker").value = "";
+    $("#dlgSet").showModal();
+    return;
+  }
+  const targets = Y().items.filter(i => i.url && (isPlaceholderName(i.name) || !i.image));
+  if (!targets.length) { toast("取得が必要な返礼品はありません"); return; }
+  btn.disabled = true;
+  let ok = 0, ng = 0;
+  for (let k = 0; k < targets.length; k++) {
+    btn.textContent = `取得中… ${k + 1}/${targets.length}`;
+    try {
+      fillFromParsed(targets[k], await fetchViaWorker(targets[k].url));
+      ok++;
+      save(); render();
+    } catch (e) { ng++; console.warn(targets[k].url, e); }
+    await new Promise(r => setTimeout(r, 400)); // 楽天に負担をかけないよう間隔をあける
+  }
+  btn.disabled = false;
+  btn.textContent = "🔄 商品名を取得";
+  save(); render();
+  toast(ng ? `${ok}件取得、${ng}件は読み取れませんでした` : `${ok}件の商品名・画像を取得しました`, 4000);
+}
 
 // バリエーションがあれば選ばせてから追加
 function addParsed(p) {
@@ -803,6 +854,7 @@ function init() {
   // リスト
   $$("#listTabs button").forEach(b => b.onclick = () => { listView = b.dataset.list; render(); });
   $("#sort").onchange = render;
+  $("#btnBackfill").onclick = backfill;
   const box = $("#items");
   box.addEventListener("click", e => {
     const t = e.target.closest("[data-act]");

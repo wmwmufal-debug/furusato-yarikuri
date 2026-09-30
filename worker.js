@@ -3,9 +3,9 @@
 // 楽天の商品ページ（item.rakuten.co.jp）と短縮URL（a.r10.to）以外は取得しない。
 
 // 公開したツールのURL（オリジン）。ここ以外のサイトからは使えないようにする。
-// 例: "https://yourname.github.io"   空配列なら制限なし
+// 例: "https://wmwmufal-debug.github.io"   空配列なら制限なし
 const ALLOWED_ORIGINS = [
-  "https://yourname.github.io",
+  "https://wmwmufal-debug.github.io",
 ];
 
 const ALLOWED_HOSTS = ["item.rakuten.co.jp", "a.r10.to", "r10.to", "hb.afl.rakuten.co.jp"];
